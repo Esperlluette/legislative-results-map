@@ -5,6 +5,7 @@ import { nuanceColor, nuanceLabel } from "./nuances.js";
 import { renderPie, renderLegend } from "./pie.js";
 
 const state = {
+  election: "legislatives",
   tour: "tour2",
   geojsonLayer: null,
   featuresByCode: new Map(),
@@ -37,7 +38,7 @@ L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
 }).addTo(map);
 
 function styleForFeature(feature) {
-  const data = feature.properties[state.tour];
+  const data = feature.properties[state.election]?.[state.tour];
   const color = data ? nuanceColor(data.leadingNuance) : "#dddddd";
   return {
     fillColor: color,
@@ -60,7 +61,7 @@ async function loadBureaux(code) {
 }
 
 function renderAggregateHtml(props) {
-  const data = props[state.tour];
+  const data = props[state.election]?.[state.tour];
   if (!data) {
     return `<div class="commune-popup"><h3>${props.nom}</h3><p>Pas de résultat disponible pour ce tour.</p></div>`;
   }
@@ -145,8 +146,8 @@ function renderSidebarList() {
     listEl.innerHTML = "";
     countEl.textContent =
       state.tour === "tour2"
-        ? "Pas de second tour dans cette circonscription (ou aucun bureau détaillé)."
-        : "Aucun bureau de vote trouvé.";
+        ? "Pas de second tour ici (candidat élu dès le 1er tour, ou aucun bureau détaillé)."
+        : "Aucun bureau de vote trouvé pour cette élection.";
     return;
   }
 
@@ -223,7 +224,7 @@ function selectBureau(idx) {
 }
 
 async function refreshSidebarBureaux() {
-  const bureaux = sidebarState.detail ? sidebarState.detail[state.tour] : null;
+  const bureaux = sidebarState.detail?.[state.election]?.[state.tour];
   sidebarState.bureaux = bureaux || [];
   renderSidebarList();
 }
@@ -257,7 +258,7 @@ function closeSidebar() {
 }
 
 function tooltipHtml(feature) {
-  const data = feature.properties[state.tour];
+  const data = feature.properties[state.election]?.[state.tour];
   const top = data?.results?.[0];
   if (!top) return `<strong>${feature.properties.nom}</strong><br>Pas de résultat`;
   const total = data.results.reduce((s, r) => s + r.voix, 0);
@@ -302,6 +303,7 @@ async function init() {
     onEachFeature,
   }).addTo(map);
 
+  setupElectionControl();
   setupTourControl();
   setupSearch(geojson.features);
   setupLegend();
@@ -333,21 +335,34 @@ function setupResetView() {
   });
 }
 
+function refreshAfterSelectionChange() {
+  state.geojsonLayer.setStyle(styleForFeature);
+
+  if (sidebarState.code) {
+    sidebarState.selectedIdx = null;
+    clearMarker();
+    showBureauDetail(null);
+    const entry = state.featuresByCode.get(sidebarState.code);
+    if (entry) document.getElementById("sidebar-aggregate").innerHTML = renderAggregateHtml(entry.feature.properties);
+    refreshSidebarBureaux();
+  }
+}
+
 function setupTourControl() {
   const select = document.getElementById("tour-select");
   select.value = state.tour;
   select.addEventListener("change", () => {
     state.tour = select.value;
-    state.geojsonLayer.setStyle(styleForFeature);
+    refreshAfterSelectionChange();
+  });
+}
 
-    if (sidebarState.code) {
-      sidebarState.selectedIdx = null;
-      clearMarker();
-      showBureauDetail(null);
-      const entry = state.featuresByCode.get(sidebarState.code);
-      if (entry) document.getElementById("sidebar-aggregate").innerHTML = renderAggregateHtml(entry.feature.properties);
-      refreshSidebarBureaux();
-    }
+function setupElectionControl() {
+  const select = document.getElementById("election-select");
+  select.value = state.election;
+  select.addEventListener("change", () => {
+    state.election = select.value;
+    refreshAfterSelectionChange();
   });
 }
 

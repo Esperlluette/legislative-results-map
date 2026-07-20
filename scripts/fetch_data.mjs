@@ -28,6 +28,14 @@ const SOURCES = [
     name: "bv-adresses.csv",
     url: "https://static.data.gouv.fr/resources/bureaux-de-vote-et-adresses-de-leurs-electeurs/20230626-135808/table-bv-reu.csv",
   },
+  {
+    name: "presidentielle-tour1.csv",
+    url: "https://static.data.gouv.fr/resources/election-presidentielle-des-10-et-24-avril-2022-resultats-definitifs-du-1er-tour/20220414-152542/resultats-par-niveau-burvot-t1-france-entiere.txt",
+  },
+  {
+    name: "presidentielle-tour2.csv",
+    url: "https://static.data.gouv.fr/resources/election-presidentielle-des-10-et-24-avril-2022-resultats-definitifs-du-2nd-tour/20220428-142237/resultats-par-niveau-burvot-t2-france-entiere.txt",
+  },
 ];
 
 async function download(name, url) {

@@ -1,11 +1,18 @@
-# polmap — Carte des résultats des législatives 2024
+# polmap — Carte des résultats électoraux
 
 Carte interactive de France (choroplèthe par commune) affichant les résultats
-officiels des élections législatives 2024 (1er et 2e tour). Au clic sur une
+officiels de deux élections — législatives 2024 et présidentielle 2022 (1er et
+2e tour de chacune, sélecteurs dans la barre du haut). Au clic sur une
 commune : camembert des résultats agrégés, participation, et une sidebar
 listant tous les bureaux de vote de la commune — triable par abstention,
 participation ou nombre d'inscrits, filtrable par adresse/école/numéro. La
 sélection d'un bureau place un point sur la carte à son adresse géocodée.
+
+Avoir les deux élections dans le même outil permet de comparer un même bureau
+de vote (même adresse, même point sur la carte) entre une présidentielle et
+une législative — utile pour juger si l'abstention ou le rapport de force
+observé sur une élection est un bon indicateur pour une autre, plutôt que de
+le supposer.
 
 Cet outil ne calcule aucun score de priorité — il affiche uniquement les
 chiffres officiels. Les décisions restent humaines.
@@ -13,8 +20,9 @@ chiffres officiels. Les décisions restent humaines.
 ## Sources de données
 
 - Résultats officiels par bureau de vote (Ministère de l'Intérieur, via data.gouv.fr) :
-  - [1er tour](https://www.data.gouv.fr/datasets/elections-legislatives-des-30-juin-et-7-juillet-2024-resultats-definitifs-du-1er-tour)
-  - [2e tour](https://www.data.gouv.fr/datasets/elections-legislatives-des-30-juin-et-7-juillet-2024-resultats-definitifs-du-2nd-tour)
+  - Législatives 2024 : [1er tour](https://www.data.gouv.fr/datasets/elections-legislatives-des-30-juin-et-7-juillet-2024-resultats-definitifs-du-1er-tour) / [2e tour](https://www.data.gouv.fr/datasets/elections-legislatives-des-30-juin-et-7-juillet-2024-resultats-definitifs-du-2nd-tour)
+  - Présidentielle 2022 : [1er tour](https://www.data.gouv.fr/datasets/election-presidentielle-des-10-et-24-avril-2022-resultats-definitifs-du-1er-tour/) / [2e tour](https://www.data.gouv.fr/datasets/election-presidentielle-des-10-et-24-avril-2022-resultats-definitifs-du-2nd-tour/)
+  - Ces deux fichiers ont des formats différents (encodage, colonnes) : les législatives sont en UTF-8 avec un code commune INSEE complet et une colonne "nuance" officielle ; la présidentielle est en Latin-1, le code commune doit être recomposé (département + commune), et il n'y a pas de nuance officielle par candidat — `scripts/process_data.mjs` la déduit via une table `NUANCE_BY_CANDIDATE` (12 candidats du 1er tour 2022, mapping fixe).
 - Contours des communes : [gregoiredavid/france-geojson](https://github.com/gregoiredavid/france-geojson) (`communes-version-simplifiee.geojson`)
 - Adresses des lieux de vote : [Bureaux de vote et adresses de leurs électeurs](https://www.data.gouv.fr/datasets/bureaux-de-vote-et-adresses-de-leurs-electeurs) (INSEE, Répertoire Électoral Unique, extraction 2022) — permet d'afficher le nom du lieu et l'adresse de chaque bureau plutôt qu'un simple numéro. Extraction 2022, donc possibles écarts mineurs avec la numérotation 2024 (~9% des communes sans adresse trouvée).
 - Coordonnées GPS des bureaux : géocodage des adresses ci-dessus via l'[API Adresse officielle](https://api-adresse.data.gouv.fr/) (Base Adresse Nationale, gratuite, sans clé) — permet de placer un point sur la carte pour le bureau sélectionné (~95% des adresses géocodées avec un score de confiance suffisant).

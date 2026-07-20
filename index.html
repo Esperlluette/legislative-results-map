@@ -3,13 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Carte des résultats - Législatives 2024</title>
+    <title>Carte des résultats électoraux</title>
   </head>
   <body>
     <div id="app">
       <header id="topbar">
-        <h1>Législatives 2024</h1>
+        <h1>Résultats électoraux</h1>
         <div id="controls">
+          <label for="election-select">Élection :</label>
+          <select id="election-select">
+            <option value="legislatives" selected>Législatives 2024</option>
+            <option value="presidentielle">Présidentielle 2022</option>
+          </select>
           <label for="tour-select">Tour :</label>
           <select id="tour-select">
             <option value="tour1">1er tour</option>

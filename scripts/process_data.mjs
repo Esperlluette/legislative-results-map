@@ -1,4 +1,5 @@
-// Agrège les CSV bruts (par bureau de vote, 1er et 2e tour) par commune, fusionne
+// Agrège les CSV bruts (par bureau de vote, 1er et 2e tour) par commune, pour
+// chaque élection configurée (législatives 2024, présidentielle 2022), fusionne
 // les résultats dans communes.geojson (pour le choroplèthe) et écrit un fichier
 // détaillé par commune dans public/data/bureaux/<code_insee>.json (chargé à la
 // demande côté client).
@@ -84,7 +85,7 @@ async function loadAddresses() {
     const street = [numVoie, voie].filter(Boolean).join(" ");
     // cp "00000" / commune vide sont des défauts du fichier source INSEE — dans ce
     // cas on complète avec le vrai nom de commune (connu par ailleurs, via les
-    // résultats électoraux) plutôt que d'afficher un faux code postal.
+    // résultats électoraux) plutôt qu'un faux code postal.
     map.set(key, { libelle, street, cp: cp && cp !== "00000" ? cp : "", communeReu });
   }
   return map;
@@ -121,7 +122,9 @@ async function loadCoords() {
   return map;
 }
 
-async function parseResultsCsv(filePath) {
+// Législatives 2024 : CSV UTF-8, code commune INSEE déjà complet, nuance politique
+// fournie par le Ministère de l'Intérieur, blocs candidat numérotés dans le header.
+async function parseLegislativesCsv(filePath) {
   const buf = await readFile(filePath);
   const text = buf.toString("utf8");
   const lines = text.split("\n").filter((l) => l.trim().length > 0);
@@ -153,7 +156,6 @@ async function parseResultsCsv(filePath) {
     });
   }
 
-  // bureaux[codeCommune] = { communeLabel, bureaux: [ {bureau, inscrits, votants, abstentions, exprimes, blancs, nuls, results:[{nuance,nom,prenom,voix,elu}]} ] }
   const byCommune = new Map();
 
   for (let li = 1; li < lines.length; li++) {
@@ -193,6 +195,106 @@ async function parseResultsCsv(filePath) {
       byCommune.set(codeCommune, {
         communeLabel: cols[iCommuneLabel]?.trim() || "",
         dept: cols[iDept]?.trim() || "",
+        bureaux: [],
+      });
+    }
+    byCommune.get(codeCommune).bureaux.push(bureauEntry);
+  }
+
+  return byCommune;
+}
+
+// Présidentielle 2022 : CSV Latin-1, code commune éclaté en "Code du département" +
+// "Code de la commune" (à recomposer), pas de colonne nuance (juste nom/prénom du
+// candidat — on la déduit via NUANCE_BY_CANDIDATE), blocs candidat non numérotés
+// dans le header (répétition des mêmes noms de colonnes).
+const NUANCE_BY_CANDIDATE = {
+  ARTHAUD: "EXG",
+  ROUSSEL: "COM",
+  MACRON: "ENS",
+  LASSALLE: "DIV",
+  "LE PEN": "RN",
+  ZEMMOUR: "REC",
+  MÉLENCHON: "FI",
+  HIDALGO: "SOC",
+  JADOT: "VEC",
+  PÉCRESSE: "LR",
+  POUTOU: "EXG",
+  "DUPONT-AIGNAN": "DVD",
+};
+
+async function parsePresidentielleCsv(filePath, { isSecondRound }) {
+  const buf = await readFile(filePath);
+  const text = buf.toString("latin1");
+  const lines = text.split("\n").filter((l) => l.trim().length > 0);
+  const header = parseCsvLine(lines[0]);
+
+  const idx = (name) => header.indexOf(name);
+  const iDept = idx("Code du département");
+  const iCommuneShort = idx("Code de la commune");
+  const iCommuneLabel = idx("Libellé de la commune");
+  const iBV = idx("Code du b.vote");
+  const iInscrits = idx("Inscrits");
+  const iVotants = idx("Votants");
+  const iAbstentions = idx("Abstentions");
+  const iExprimes = idx("Exprimés");
+  const iBlancs = idx("Blancs");
+  const iNuls = idx("Nuls");
+
+  // Le header ne liste les colonnes candidat ("N°Panneau;Sexe;Nom;Prénom;Voix;...")
+  // qu'UNE seule fois, alors que chaque ligne de données répète ce bloc de 7
+  // colonnes une fois par candidat (12 fois au 1er tour, 2 au 2nd). On calcule donc
+  // le nombre de blocs à partir de la longueur réelle d'une ligne de données plutôt
+  // que du header.
+  const blockStart = idx("N°Panneau");
+  const blockWidth = 7; // N°Panneau, Sexe, Nom, Prénom, Voix, % Voix/Ins, % Voix/Exp
+  const firstDataCols = parseCsvLine(lines[1]);
+  const nomIndices = [];
+  for (let n = 0; blockStart + n * blockWidth + 2 < firstDataCols.length; n++) {
+    nomIndices.push(blockStart + n * blockWidth + 2); // "Nom" est le 3e champ du bloc
+  }
+
+  const byCommune = new Map();
+
+  for (let li = 1; li < lines.length; li++) {
+    const cols = parseCsvLine(lines[li]);
+    if (cols.length < header.length - 5) continue;
+    const dept = cols[iDept]?.trim();
+    const communeShort = cols[iCommuneShort]?.trim();
+    if (!dept || !communeShort) continue;
+    const codeCommune = dept + communeShort.padStart(3, "0");
+
+    const results = [];
+    for (const nomIdx of nomIndices) {
+      const nom = cols[nomIdx]?.trim();
+      if (!nom) continue;
+      const nuance = NUANCE_BY_CANDIDATE[nom.toUpperCase()] || null;
+      results.push({
+        nuance,
+        nom,
+        prenom: cols[nomIdx + 1]?.trim() || "",
+        voix: parseFrNumber(cols[nomIdx + 2]),
+        // Pas de colonne "élu" par bureau pour la présidentielle (le résultat se
+        // joue au niveau national) — on marque le vainqueur officiel du 2nd tour.
+        elu: isSecondRound && nom.toUpperCase() === "MACRON",
+      });
+    }
+
+    const bureauEntry = {
+      bureau: (cols[iBV]?.trim() || "").padStart(4, "0"),
+      inscrits: parseFrNumber(cols[iInscrits]),
+      votants: parseFrNumber(cols[iVotants]),
+      abstentions: parseFrNumber(cols[iAbstentions]),
+      exprimes: parseFrNumber(cols[iExprimes]),
+      blancs: parseFrNumber(cols[iBlancs]),
+      nuls: parseFrNumber(cols[iNuls]),
+      results,
+    };
+
+    if (!byCommune.has(codeCommune)) {
+      byCommune.set(codeCommune, {
+        communeLabel: cols[iCommuneLabel]?.trim() || "",
+        dept,
         bureaux: [],
       });
     }
@@ -242,13 +344,40 @@ function aggregateCommune(bureaux) {
   };
 }
 
+function bvSummary(bv) {
+  const participation = bv.inscrits > 0 ? +((bv.votants / bv.inscrits) * 100).toFixed(2) : 0;
+  const results = bv.results
+    .map((r) => ({ ...r, pct: bv.exprimes > 0 ? +((r.voix / bv.exprimes) * 100).toFixed(2) : 0 }))
+    .sort((a, b) => b.voix - a.voix);
+  return { participation, results };
+}
+
+// Chaque élection ajoutée ici est automatiquement fusionnée dans communes.geojson
+// (props.<key>.tour1/tour2) et dans public/data/bureaux/<code>.json.
+const ELECTIONS = [
+  {
+    key: "legislatives",
+    label: "Législatives 2024",
+    tour1File: "tour1-bureaux.csv",
+    tour2File: "tour2-bureaux.csv",
+    parse: (filePath) => parseLegislativesCsv(filePath),
+  },
+  {
+    key: "presidentielle",
+    label: "Présidentielle 2022",
+    tour1File: "presidentielle-tour1.csv",
+    tour2File: "presidentielle-tour2.csv",
+    parse: (filePath, isSecondRound) => parsePresidentielleCsv(filePath, { isSecondRound }),
+  },
+];
+
 async function main() {
   console.log("[1/5] Lecture des CSV bruts...");
-  const [tour1, tour2] = await Promise.all([
-    parseResultsCsv(path.join(RAW_DIR, "tour1-bureaux.csv")),
-    parseResultsCsv(path.join(RAW_DIR, "tour2-bureaux.csv")),
-  ]);
-  console.log(`  tour1: ${tour1.size} communes | tour2: ${tour2.size} communes`);
+  for (const election of ELECTIONS) {
+    election.tour1 = await election.parse(path.join(RAW_DIR, election.tour1File), false);
+    election.tour2 = await election.parse(path.join(RAW_DIR, election.tour2File), true);
+    console.log(`  ${election.label} — tour1: ${election.tour1.size} communes | tour2: ${election.tour2.size} communes`);
+  }
 
   console.log("[2/5] Chargement du geojson des communes...");
   const geojson = JSON.parse(await readFile(path.join(RAW_DIR, "communes.geojson"), "utf8"));
@@ -263,16 +392,22 @@ async function main() {
   for (const feature of geojson.features) {
     const code = feature.properties.code;
     const props = { code, nom: feature.properties.nom };
+    let hasAny = false;
 
-    const c1 = tour1.get(code);
-    const c2 = tour2.get(code);
-    if (c1) props.tour1 = aggregateCommune(c1.bureaux);
-    if (c2) props.tour2 = aggregateCommune(c2.bureaux);
-    if (c1 || c2) matched++;
+    for (const election of ELECTIONS) {
+      const c1 = election.tour1.get(code);
+      const c2 = election.tour2.get(code);
+      if (!c1 && !c2) continue;
+      props[election.key] = {};
+      if (c1) props[election.key].tour1 = aggregateCommune(c1.bureaux);
+      if (c2) props[election.key].tour2 = aggregateCommune(c2.bureaux);
+      hasAny = true;
+    }
+    if (hasAny) matched++;
 
     feature.properties = props;
   }
-  console.log(`  ${matched}/${geojson.features.length} communes avec des résultats`);
+  console.log(`  ${matched}/${geojson.features.length} communes avec au moins un résultat`);
 
   await mkdir(OUT_DIR, { recursive: true });
   await writeFile(path.join(OUT_DIR, "communes.geojson"), JSON.stringify(geojson));
@@ -288,7 +423,7 @@ async function main() {
     let adresse = null;
     if (addr) {
       // Complète avec le vrai nom de commune (issu des résultats électoraux, fiable)
-      // quand le code postal source est absent/invalide, plutôt qu'un faux "00000".
+      // quand le code postal source est absent/invalide, plutôt qu'un faux code postal.
       const cityPart = addr.cp ? `${addr.cp} ${addr.communeReu}`.trim() : communeLabel;
       adresse = [addr.street, cityPart].filter(Boolean).join(", ");
     }
@@ -302,36 +437,37 @@ async function main() {
     };
   };
 
-  const allCodes = new Set([...tour1.keys(), ...tour2.keys()]);
+  const allCodes = new Set();
+  for (const election of ELECTIONS) {
+    for (const code of election.tour1.keys()) allCodes.add(code);
+    for (const code of election.tour2.keys()) allCodes.add(code);
+  }
+
   let written = 0;
   let withAddr = 0;
   for (const code of allCodes) {
-    const c1 = tour1.get(code);
-    const c2 = tour2.get(code);
-    const communeLabel = c1?.communeLabel || c2?.communeLabel || "";
-    const t1 = c1 ? c1.bureaux.map(withAddress(code, communeLabel)) : null;
-    const t2 = c2 ? c2.bureaux.map(withAddress(code, communeLabel)) : null;
-    if (t1?.some((b) => b.adresse) || t2?.some((b) => b.adresse)) withAddr++;
-    const detail = {
-      code,
-      nom: c1?.communeLabel || c2?.communeLabel || "",
-      tour1: t1,
-      tour2: t2,
-    };
+    const detail = { code, nom: "" };
+    let anyAddr = false;
+
+    for (const election of ELECTIONS) {
+      const c1 = election.tour1.get(code);
+      const c2 = election.tour2.get(code);
+      if (!c1 && !c2) continue;
+      const communeLabel = c1?.communeLabel || c2?.communeLabel || "";
+      if (!detail.nom) detail.nom = communeLabel;
+      const t1 = c1 ? c1.bureaux.map(withAddress(code, communeLabel)) : null;
+      const t2 = c2 ? c2.bureaux.map(withAddress(code, communeLabel)) : null;
+      if (t1?.some((b) => b.adresse) || t2?.some((b) => b.adresse)) anyAddr = true;
+      detail[election.key] = { tour1: t1, tour2: t2 };
+    }
+
+    if (anyAddr) withAddr++;
     await writeFile(path.join(BUREAUX_DIR, `${code}.json`), JSON.stringify(detail));
     written++;
   }
   console.log(`  ${written} fichiers écrits (${withAddr} communes avec au moins une adresse)`);
 
   console.log("Terminé.");
-}
-
-function bvSummary(bv) {
-  const participation = bv.inscrits > 0 ? +((bv.votants / bv.inscrits) * 100).toFixed(2) : 0;
-  const results = bv.results
-    .map((r) => ({ ...r, pct: bv.exprimes > 0 ? +((r.voix / bv.exprimes) * 100).toFixed(2) : 0 }))
-    .sort((a, b) => b.voix - a.voix);
-  return { participation, results };
 }
 
 main().catch((err) => {
