@@ -175,8 +175,11 @@ async function parseResultsCsv(filePath) {
       });
     }
 
+    // Le code BV n'est pas zéro-préfixé dans le fichier du 1er tour ("1", "2"...)
+    // contrairement au 2nd tour et à la base d'adresses ("0001", "0002"...) — on
+    // uniformise sur 4 chiffres pour que la jointure avec les adresses fonctionne.
     const bureauEntry = {
-      bureau: cols[iBV]?.trim() || "",
+      bureau: (cols[iBV]?.trim() || "").padStart(4, "0"),
       inscrits: parseFrNumber(cols[iInscrits]),
       votants: parseFrNumber(cols[iVotants]),
       abstentions: parseFrNumber(cols[iAbstentions]),
