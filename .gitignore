@@ -1,0 +1,8 @@
+node_modules/
+data/raw/
+dist/
+.DS_Store
+
+# public/data/ est généré par process_data.mjs mais VERSIONNÉ volontairement :
+# le déploiement (GitHub Pages) sert directement ces fichiers sans refaire tourner
+# le pipeline de données (télécharger 70+ Mo et géocoder ~69 000 adresses) à chaque build.

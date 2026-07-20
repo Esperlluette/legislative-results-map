@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Carte des résultats - Législatives 2024</title>
+  </head>
+  <body>
+    <div id="app">
+      <header id="topbar">
+        <h1>Législatives 2024</h1>
+        <div id="controls">
+          <label for="tour-select">Tour :</label>
+          <select id="tour-select">
+            <option value="tour1">1er tour</option>
+            <option value="tour2" selected>2e tour</option>
+          </select>
+          <div class="search-wrap">
+            <input id="search-input" type="text" placeholder="Rechercher une commune..." autocomplete="off" />
+            <div id="search-results"></div>
+          </div>
+          <button id="reset-view" type="button" title="Revenir à la vue France entière">Vue France</button>
+        </div>
+      </header>
+      <div id="map-wrap">
+        <div id="map"></div>
+        <div id="hint">Cliquez sur une commune pour voir le détail du vote</div>
+        <div id="legend"></div>
+        <div id="loading">
+          <div class="spinner"></div>
+          <div>Chargement des données électorales…</div>
+        </div>
+
+        <aside id="sidebar" class="hidden">
+          <div class="sidebar-header">
+            <div>
+              <h2 id="sidebar-title">—</h2>
+            </div>
+            <button id="sidebar-close" type="button" aria-label="Fermer">✕</button>
+          </div>
+
+          <div id="sidebar-aggregate" class="sidebar-aggregate"></div>
+
+          <div class="sidebar-controls">
+            <input id="sidebar-filter" type="text" placeholder="Filtrer : école, rue, n°…" autocomplete="off" />
+            <div class="sidebar-sort-row">
+              <label for="sidebar-sort">Trier par</label>
+              <select id="sidebar-sort">
+                <option value="numero">N° de bureau</option>
+                <option value="abstention_desc">Abstention — la plus forte</option>
+                <option value="abstention_asc">Abstention — la plus faible</option>
+                <option value="participation_desc">Participation — la plus forte</option>
+                <option value="participation_asc">Participation — la plus faible</option>
+                <option value="inscrits_desc">Inscrits — du plus grand</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="sidebar-count" class="sidebar-count"></div>
+          <ul id="sidebar-list"></ul>
+
+          <div id="sidebar-selection" class="hidden"></div>
+        </aside>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
