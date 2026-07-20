@@ -16,8 +16,9 @@ const state = {
 const sidebarState = {
   code: null,
   nom: null,
-  detail: null, // { tour1: [...], tour2: [...] } tel que renvoyé par bureaux/<code>.json
+  detail: null, // { legislatives: {tour1,tour2}, presidentielle: {tour1,tour2} } tel que renvoyé par bureaux/<code>.json
   bureaux: [],
+  riskyBureaux: new Map(), // bureau -> inscrits dans l'autre élection, si numérotation suspecte
   filterText: "",
   sort: "numero",
   selectedIdx: null,
@@ -122,15 +123,48 @@ function sidebarStatLabel(bv) {
   }
 }
 
+const ELECTION_KEYS = ["legislatives", "presidentielle"];
+function otherElectionKey(key) {
+  return ELECTION_KEYS.find((k) => k !== key);
+}
+
+// La numérotation des bureaux de vote n'est pas garantie stable d'une élection à
+// l'autre (redécoupages) : le même numéro peut désigner un lieu différent. On le
+// détecte en comparant le nombre d'inscrits du même numéro de bureau dans l'autre
+// élection disponible — un écart important (x2) est un signal fiable de bureau
+// différent, sans avoir besoin de connaître les vraies géométries.
+function computeRiskyBureaux(bureaux) {
+  const risky = new Map(); // bureau -> inscrits de l'autre élection
+  const otherKey = otherElectionKey(state.election);
+  const otherElection = sidebarState.detail?.[otherKey];
+  if (!otherElection) return risky;
+
+  const otherBureaux = otherElection.tour2 || otherElection.tour1;
+  if (!otherBureaux) return risky;
+  const otherByNumero = new Map(otherBureaux.map((bv) => [bv.bureau, bv]));
+
+  for (const bv of bureaux) {
+    const other = otherByNumero.get(bv.bureau);
+    if (!other || bv.inscrits === 0 || other.inscrits === 0) continue;
+    const ratio = bv.inscrits / other.inscrits;
+    if (ratio > 2 || ratio < 0.5) risky.set(bv.bureau, other.inscrits);
+  }
+  return risky;
+}
+
 function sidebarRowHtml(bv, idx) {
   const top = bv.results[0];
   const color = top ? nuanceColor(top.nuance) : "#ccc";
   const selected = sidebarState.selectedIdx === idx ? " selected" : "";
+  const otherInscrits = sidebarState.riskyBureaux.get(bv.bureau);
+  const warning = otherInscrits
+    ? `<span class="row-warn" title="Ce numéro de bureau a ${bv.inscrits.toLocaleString("fr-FR")} inscrits ici contre ${otherInscrits.toLocaleString("fr-FR")} pour la même numérotation dans l'autre élection — probablement un découpage différent, pas le même lieu.">⚠️</span>`
+    : "";
   return `
     <li class="bureau-row${selected}" data-idx="${idx}">
       <span class="row-dot" style="background:${color}"></span>
       <div class="row-text">
-        <div class="row-title">N°${bv.bureau}${bv.libelle ? " — " + bv.libelle : ""}</div>
+        <div class="row-title">N°${bv.bureau}${bv.libelle ? " — " + bv.libelle : ""} ${warning}</div>
         <div class="row-sub">${bv.adresse || "Adresse inconnue"}</div>
       </div>
       <div class="row-stat">${sidebarStatLabel(bv)}</div>
@@ -148,6 +182,7 @@ function renderSidebarList() {
       state.tour === "tour2"
         ? "Pas de second tour ici (candidat élu dès le 1er tour, ou aucun bureau détaillé)."
         : "Aucun bureau de vote trouvé pour cette élection.";
+    document.getElementById("sidebar-warning").classList.add("hidden");
     return;
   }
 
@@ -164,6 +199,20 @@ function renderSidebarList() {
   listEl.querySelectorAll(".bureau-row").forEach((el) => {
     el.addEventListener("click", () => selectBureau(+el.dataset.idx));
   });
+
+  renderSidebarWarning();
+}
+
+function renderSidebarWarning() {
+  const warnEl = document.getElementById("sidebar-warning");
+  const n = sidebarState.riskyBureaux.size;
+  if (n === 0) {
+    warnEl.classList.add("hidden");
+    warnEl.innerHTML = "";
+    return;
+  }
+  warnEl.classList.remove("hidden");
+  warnEl.innerHTML = `⚠️ ${n} bureau${n > 1 ? "x" : ""} marqué${n > 1 ? "s" : ""} ⚠️ : le nombre d'inscrits sous ce numéro diffère fortement entre les deux élections — la numérotation des bureaux a probablement changé, ne pas supposer qu'il s'agit du même lieu.`;
 }
 
 function clearMarker() {
@@ -226,6 +275,7 @@ function selectBureau(idx) {
 async function refreshSidebarBureaux() {
   const bureaux = sidebarState.detail?.[state.election]?.[state.tour];
   sidebarState.bureaux = bureaux || [];
+  sidebarState.riskyBureaux = computeRiskyBureaux(sidebarState.bureaux);
   renderSidebarList();
 }
 
@@ -244,6 +294,7 @@ async function openSidebarForCommune(props) {
   document.getElementById("sidebar-aggregate").innerHTML = renderAggregateHtml(props);
   document.getElementById("sidebar-list").innerHTML = `<li class="sidebar-loading">Chargement des bureaux de vote…</li>`;
   document.getElementById("sidebar-count").textContent = "";
+  document.getElementById("sidebar-warning").classList.add("hidden");
 
   const detail = await loadBureaux(props.code);
   if (sidebarState.code !== props.code) return; // une autre commune a été ouverte entre-temps

@@ -296,6 +296,25 @@ html, body {
   flex-shrink: 0;
 }
 
+.sidebar-warning {
+  margin: 0.5rem 0.9rem 0;
+  padding: 0.5rem 0.6rem;
+  background: #fff6e0;
+  border: 1px solid #f0c96b;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: #6b5100;
+  flex-shrink: 0;
+}
+
+.sidebar-warning.hidden {
+  display: none;
+}
+
+.row-warn {
+  cursor: help;
+}
+
 #sidebar-list {
   list-style: none;
   margin: 0;
