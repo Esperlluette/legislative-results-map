@@ -415,9 +415,29 @@ html, body {
   line-height: 1;
 }
 
-#legend h4 {
-  margin: 0 0 0.4rem 0;
+.legend-details summary {
   font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.legend-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.legend-details summary::after {
+  content: " ▸";
+  color: #999;
+}
+
+.legend-details[open] summary::after {
+  content: " ▾";
+}
+
+.legend-body {
+  margin-top: 0.4rem;
 }
 
 .legend-row {
@@ -513,4 +533,181 @@ html, body {
 .commune-popup .loading {
   font-style: italic;
   color: #777;
+}
+
+/* ==========================================================================
+   Affichage mobile
+   ========================================================================== */
+@media (max-width: 640px) {
+  /* --- Barre du haut : titre + contrôles empilés et compacts --- */
+  #topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding: 0.55rem 0.7rem;
+  }
+
+  #topbar h1 {
+    font-size: 1rem;
+    text-align: center;
+    white-space: normal;
+  }
+
+  #controls {
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  /* Les libellés « Élection : » / « Tour : » sont redondants avec les options,
+     on les masque pour gagner de la place. */
+  #controls label {
+    display: none;
+  }
+
+  #controls select,
+  #controls input,
+  #controls button {
+    padding: 0.55rem 0.5rem;
+    font-size: 0.95rem;
+  }
+
+  /* Ligne 1 : les deux menus déroulants côte à côte. */
+  #controls select {
+    flex: 1 1 46%;
+    min-width: 0;
+  }
+
+  /* Ligne 2 : la recherche prend la place et « Vue France » se cale à côté. */
+  .search-wrap {
+    flex: 1 1 58%;
+    min-width: 0;
+  }
+
+  #search-input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  #search-results {
+    width: auto;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    max-height: 50vh;
+  }
+
+  #search-results div {
+    padding: 0.6rem 0.7rem;
+    font-size: 0.9rem;
+  }
+
+  #reset-view {
+    flex: 1 1 30%;
+  }
+
+  /* --- Légende repliable, plus petite et calée en bas à gauche --- */
+  #legend {
+    bottom: 0.75rem;
+    left: 0.6rem;
+    right: auto;
+    padding: 0.5rem 0.6rem;
+    max-width: 60vw;
+    font-size: 0.75rem;
+  }
+
+  /* --- Panneau latéral : feuille qui remonte du bas de l'écran --- */
+  #sidebar {
+    position: fixed;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    height: 85vh;
+    height: 85dvh;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.28);
+    transform: translateY(0);
+    transition: transform 0.28s ease;
+    font-size: 0.9rem;
+  }
+
+  #sidebar.hidden {
+    transform: translateY(100%);
+  }
+
+  /* Poignée de préhension en haut de la feuille. */
+  #sidebar::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: #d0d0d8;
+    z-index: 1;
+  }
+
+  .sidebar-header {
+    padding: 1.1rem 0.9rem 0.5rem;
+  }
+
+  .sidebar-header h2 {
+    font-size: 1.1rem;
+  }
+
+  #sidebar-close {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+
+  /* Cibles tactiles plus généreuses. */
+  .sidebar-controls input,
+  .sidebar-sort-row select {
+    padding: 0.55rem 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .bureau-row {
+    padding: 0.65rem 0.5rem;
+    gap: 0.6rem;
+  }
+
+  .row-title {
+    font-size: 0.88rem;
+  }
+
+  .row-sub {
+    font-size: 0.78rem;
+    white-space: normal;
+  }
+
+  #sidebar-selection {
+    max-height: 48vh;
+  }
+
+  /* Les camemberts et légendes s'affichent en colonne si c'est trop serré. */
+  .commune-popup {
+    min-width: 0;
+  }
+
+  /* La bulle d'info survolée n'a pas de sens au toucher : on la neutralise. */
+  .commune-tooltip {
+    display: none !important;
+  }
+}
+
+/* Sur les écrans qui ne survolent pas (tactile), pas d'effet hover trompeur. */
+@media (hover: none) {
+  .bureau-row:hover {
+    background: none;
+  }
+
+  .bureau-row.selected {
+    background: #e8e8fb;
+  }
 }

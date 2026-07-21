@@ -470,15 +470,21 @@ function setupSearch(features) {
 function setupLegend() {
   const legendCodes = ["EXG", "UG", "SOC", "VEC", "ENS", "UDI", "LR", "REC", "RN", "DIV"];
   const el = document.getElementById("legend");
-  el.innerHTML =
-    `<h4>Nuance en tête</h4>` +
-    legendCodes
-      .map(
-        (n) =>
-          `<div class="legend-row"><span class="legend-swatch" style="background:${nuanceColor(n)}"></span>${nuanceLabel(n)}</div>`
-      )
-      .join("") +
-    `<div class="legend-hint">Cliquez sur une commune pour ouvrir la liste des bureaux, triable par abstention, participation…</div>`;
+  // Repliée par défaut sur mobile pour ne pas manger la carte, dépliée sur desktop.
+  const openByDefault = window.matchMedia("(min-width: 641px)").matches;
+  el.innerHTML = `
+    <details class="legend-details"${openByDefault ? " open" : ""}>
+      <summary>Nuance en tête</summary>
+      <div class="legend-body">
+        ${legendCodes
+          .map(
+            (n) =>
+              `<div class="legend-row"><span class="legend-swatch" style="background:${nuanceColor(n)}"></span>${nuanceLabel(n)}</div>`
+          )
+          .join("")}
+        <div class="legend-hint">Touchez une commune pour ouvrir la liste des bureaux, triable par abstention, participation…</div>
+      </div>
+    </details>`;
 }
 
 init();
